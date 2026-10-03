@@ -19,13 +19,27 @@ def get_transactions(
     status: str = None,
     member_id: int = None,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_admin)
+    current_user: models.User = Depends(security.get_current_user)
 ):
     query = db.query(models.BorrowTransaction)
+    
+    if current_user.role == "student":
+        member = current_user.member_profile
+        if not member:
+            member = db.query(models.Member).filter(
+                (models.Member.user_id == current_user.id) | (models.Member.email == current_user.email)
+            ).first()
+            if member and not member.user_id:
+                member.user_id = current_user.id
+                db.commit()
+        if not member:
+            return []
+        query = query.filter(models.BorrowTransaction.member_id == member.id)
+    elif member_id:
+        query = query.filter(models.BorrowTransaction.member_id == member_id)
+        
     if status:
         query = query.filter(models.BorrowTransaction.status == status)
-    if member_id:
-        query = query.filter(models.BorrowTransaction.member_id == member_id)
         
     transactions = query.order_by(models.BorrowTransaction.created_at.desc()).offset(skip).limit(limit).all()
     return transactions
@@ -34,13 +48,30 @@ def get_transactions(
 def get_fines(
     status: str = None,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_admin)
+    current_user: models.User = Depends(security.get_current_user)
 ):
     query = db.query(models.Fine)
+    
+    if current_user.role == "student":
+        member = current_user.member_profile
+        if not member:
+            member = db.query(models.Member).filter(
+                (models.Member.user_id == current_user.id) | (models.Member.email == current_user.email)
+            ).first()
+            if member and not member.user_id:
+                member.user_id = current_user.id
+                db.commit()
+        if not member:
+            return []
+        query = query.join(models.BorrowTransaction).filter(
+            models.BorrowTransaction.member_id == member.id
+        )
+        
     if status:
         query = query.filter(models.Fine.status == status)
     
     return query.all()
+
 
 
 def get_setting_int(db: Session, key: str, default: int) -> int:

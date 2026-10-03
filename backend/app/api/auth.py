@@ -31,7 +31,19 @@ def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = 
     return {"access_token": access_token, "token_type": "bearer", "role": user.role, "user_id": user.id}
 
 @router.get("/me", response_model=schemas.UserResponse)
-def read_users_me(current_user: models.User = Depends(security.get_current_user)):
+def read_users_me(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.member_profile:
+        member = db.query(models.Member).filter(
+            (models.Member.user_id == current_user.id) | (models.Member.email == current_user.email)
+        ).first()
+        if member:
+            if not member.user_id:
+                member.user_id = current_user.id
+                db.commit()
+            current_user.member_profile = member
     return current_user
 
 @router.post("/change-password")

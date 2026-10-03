@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { authService } from '../services/auth';
-import type { User } from '../services/auth';
+import type { User, AdminProfile } from '../services/auth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -8,6 +9,7 @@ interface AuthContextType {
   role: string | null;
   login: (token: string, role: string, userData?: User) => void;
   logout: () => void;
+  updateProfile: (profile: Partial<AdminProfile>) => AdminProfile;
   isLoading: boolean;
 }
 
@@ -27,7 +29,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(userData);
         } catch (error) {
           console.error("Failed to load user session", error);
-          // Only force logout if it's an auth error (handled by interceptor)
         }
       }
       setIsLoading(false);
@@ -36,11 +37,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, [isAuthenticated]);
 
-  const login = (token: string, role: string, userData?: User) => {
+  const login = (_token: string, role: string, userData?: User) => {
     setIsAuthenticated(true);
     setRole(role);
     if (userData) {
-      setUser(userData);
+      const storedProfile = authService.getStoredProfile();
+      setUser({ ...userData, ...storedProfile });
+    } else {
+      authService.getCurrentUser().then(u => setUser(u)).catch(() => {});
     }
   };
 
@@ -51,8 +55,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
+  const updateProfile = (newProfile: Partial<AdminProfile>): AdminProfile => {
+    const updated = authService.saveProfile(newProfile);
+    setUser(prev => prev ? {
+      ...prev,
+      name: updated.name,
+      title: updated.title,
+      department: updated.department,
+      phone: updated.phone,
+      bio: updated.bio,
+      avatarColor: updated.avatarColor
+    } : null);
+    return updated;
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, role, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, role, login, logout, updateProfile, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

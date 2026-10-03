@@ -44,5 +44,10 @@ export const memberService = {
   updateStatus: async (id: number, status: string) => {
     const response = await api.patch<Member>(`/members/${id}/status`, { status });
     return response.data;
+  },
+  
+  getMyProfile: async () => {
+    const response = await api.get<Member>('/members/me');
+    return response.data;
   }
 };

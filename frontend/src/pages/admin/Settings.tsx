@@ -425,12 +425,16 @@ const SettingsPage: React.FC = () => {
 
             <div className="space-y-3 pt-2 text-sm">
               <div>
-                <p className="text-gray-500 text-xs">Logged-in Email</p>
-                <p className="font-medium text-gray-800 truncate">{user?.email}</p>
+                <p className="text-gray-500 text-xs">Account Identifier</p>
+                <p className="font-medium font-mono text-gray-800">#ADM-{String(user?.id || 1).padStart(4, '0')}</p>
               </div>
               <div>
-                <p className="text-gray-500 text-xs">Account Type</p>
-                <p className="font-medium text-gray-800 capitalize">{user?.role} Access</p>
+                <p className="text-gray-500 text-xs">Administrator Name</p>
+                <p className="font-medium text-gray-800">{user?.name || 'Administrator'}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-xs">Account Clearance</p>
+                <p className="font-medium text-gray-800 capitalize">{user?.role || 'Admin'} Access (Full Privileges)</p>
               </div>
               <div>
                 <p className="text-gray-500 text-xs">Authentication Protocol</p>

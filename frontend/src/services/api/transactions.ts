@@ -1,6 +1,5 @@
 import api from '../api';
 import type { Book } from './books';
-import type { Member } from '../auth'; // We'll need to define Member type or import it
 
 export interface MemberResponse {
   id: number;

@@ -51,6 +51,27 @@ def get_members(
         "total_pages": total_pages
     }
 
+@router.get("/me", response_model=schemas.MemberResponse)
+def get_my_member_profile(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    profile = current_user.member_profile
+    if not profile:
+        profile = db.query(models.Member).filter(
+            or_(
+                models.Member.user_id == current_user.id,
+                models.Member.email == current_user.email
+            )
+        ).first()
+        if profile:
+            if not profile.user_id:
+                profile.user_id = current_user.id
+                db.commit()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    return profile
+
 @router.get("/{member_id}", response_model=schemas.MemberResponse)
 def get_member(
     member_id: int, 
@@ -111,6 +132,12 @@ def update_member(
         
     update_data = member_update.model_dump(exclude_unset=True)
     
+    # Check if student_id is being changed and is already taken
+    if "student_id" in update_data and update_data["student_id"] and update_data["student_id"] != db_member.student_id:
+        existing = db.query(models.Member).filter(models.Member.student_id == update_data["student_id"]).first()
+        if existing and existing.id != member_id:
+            raise HTTPException(status_code=409, detail="A member with this student ID already exists")
+
     for key, value in update_data.items():
         setattr(db_member, key, value)
         

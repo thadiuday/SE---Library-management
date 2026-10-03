@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,11 +10,9 @@ import MemberList from './pages/admin/MemberList';
 import TransactionList from './pages/admin/TransactionList';
 import FinesList from './pages/admin/FinesList';
 import SettingsPage from './pages/admin/Settings';
-
+import Profile from './pages/admin/Profile';
 import Dashboard from './pages/admin/Dashboard';
-
-// Placeholder components
-const StudentDashboard = () => <div className="p-8"><h1>Student Dashboard</h1></div>;
+import StudentDashboard from './pages/student/StudentDashboard';
 
 // Root redirect based on auth status
 const RootRedirect = () => {
@@ -53,6 +50,7 @@ const AppRoutes = () => {
         <Route path="transactions" element={<TransactionList />} />
         <Route path="fines" element={<FinesList />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
       
       {/* Student Routes */}

@@ -144,7 +144,7 @@ const TransactionList: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700">Member</label>
                       <select required value={formData.member_id} onChange={(e) => setFormData({...formData, member_id: Number(e.target.value)})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
                         <option value="">Select Member...</option>
-                        {members.map(m => <option key={m.id} value={m.id}>{m.name} ({m.email})</option>)}
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name} [ID: {m.student_id}]</option>)}
                       </select>
                     </div>
                     <div>

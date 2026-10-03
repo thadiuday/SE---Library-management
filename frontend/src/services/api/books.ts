@@ -15,8 +15,8 @@ export interface Book {
   publisher: string | null;
   publication_year: number | null;
   description: string | null;
-  total_copies: int;
-  available_copies: int;
+  total_copies: number;
+  available_copies: number;
   shelf_location: string | null;
   category?: Category;
 }

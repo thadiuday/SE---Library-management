@@ -13,6 +13,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: datetime
+    member_profile: Optional["MemberResponse"] = None
     
     class Config:
         from_attributes = True
@@ -93,6 +94,7 @@ class MemberUpdate(BaseModel):
     phone: Optional[str] = None
     department: Optional[str] = None
     year: Optional[int] = None
+    student_id: Optional[str] = None
 
 class MemberResponse(MemberBase):
     id: int
@@ -153,3 +155,6 @@ class LibrarySettings(BaseModel):
     contact_email: EmailStr = Field(default="library@campus.edu")
     contact_phone: Optional[str] = Field(default="+1 (555) 019-2834")
     operating_hours: Optional[str] = Field(default="Mon-Fri: 8:00 AM - 8:00 PM, Sat: 9:00 AM - 4:00 PM")
+
+UserResponse.model_rebuild()
+
