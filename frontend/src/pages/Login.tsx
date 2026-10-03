@@ -39,10 +39,12 @@ const Login: React.FC = () => {
         navigate(data.role === 'admin' ? '/admin/dashboard' : '/student/dashboard');
       }
     } catch (err: any) {
-      if (err.response && err.response.data && err.response.data.detail) {
+      if (err.response?.data?.detail) {
         setError(err.response.data.detail);
+      } else if (!err.response) {
+        setError('Cannot connect to backend server. Please verify the FastAPI backend is running at http://127.0.0.1:8000.');
       } else {
-        setError('Invalid credentials. Please verify and try again.');
+        setError('Invalid credentials. Please verify your email/identifier and password.');
       }
     } finally {
       setIsLoading(false);
