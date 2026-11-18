@@ -26,6 +26,8 @@ import { bookService } from '../../services/api/books';
 import type { Book, Category } from '../../services/api/books';
 import { memberService } from '../../services/api/members';
 import type { Member } from '../../services/api/members';
+import { settingsService } from '../../services/api/settings';
+import type { LibrarySettings } from '../../services/api/settings';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,6 +39,7 @@ const StudentDashboard: React.FC = () => {
   
   // Data State
   const [memberProfile, setMemberProfile] = useState<Member | null>(null);
+  const [librarySettings, setLibrarySettings] = useState<LibrarySettings | null>(null);
   const [transactions, setTransactions] = useState<BorrowTransaction[]>([]);
   const [fines, setFines] = useState<Fine[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
@@ -60,15 +63,17 @@ const StudentDashboard: React.FC = () => {
   const fetchStudentData = async () => {
     try {
       setIsLoading(true);
-      const [profileData, txData, finesData, catsData, booksData] = await Promise.all([
+      const [profileData, txData, finesData, catsData, booksData, settingsData] = await Promise.all([
         memberService.getMyProfile().catch(() => null),
         transactionService.getTransactions().catch(() => []),
         transactionService.getFines().catch(() => []),
         bookService.getCategories().catch(() => []),
-        bookService.getBooks({ page_size: 20 }).catch(() => ({ items: [] }))
+        bookService.getBooks({ page_size: 20 }).catch(() => ({ items: [] })),
+        settingsService.getSettings().catch(() => null)
       ]);
 
       if (profileData) setMemberProfile(profileData);
+      if (settingsData) setLibrarySettings(settingsData);
       setTransactions(txData);
       setFines(finesData);
       setCategories(catsData);
@@ -377,13 +382,29 @@ const StudentDashboard: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Account Eligibility</span>
-                    <p className="text-xl sm:text-2xl font-extrabold text-emerald-600 tracking-tight flex items-center gap-1.5 mt-1">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      {memberStatus === 'active' ? 'Eligible' : 'Suspended'}
+                    <p className={`text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-1.5 mt-1 ${
+                      totalUnpaidFines > 0 ? 'text-rose-600' : memberStatus === 'active' ? 'text-emerald-600' : 'text-slate-600'
+                    }`}>
+                      {totalUnpaidFines > 0 ? (
+                        <>
+                          <AlertCircle className="w-5 h-5 text-rose-500" />
+                          Dues Pending
+                        </>
+                      ) : memberStatus === 'active' ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          Eligible
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-5 h-5 text-slate-400" />
+                          Suspended
+                        </>
+                      )}
                     </p>
-                    <p className="text-xs text-slate-600">Borrowing card active</p>
+                    <p className="text-xs text-slate-600">{totalUnpaidFines > 0 ? 'Clear fines to borrow' : 'Borrowing card active'}</p>
                   </div>
-                  <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
+                  <div className={`p-3 rounded-2xl ${totalUnpaidFines > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'} group-hover:scale-110 transition-transform`}>
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                 </div>
@@ -395,7 +416,7 @@ const StudentDashboard: React.FC = () => {
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Books Currently in Your Possession</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Please ensure books are returned on or before the due date to avoid overdue charges ($5/day).</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Please ensure books are returned on or before the due date to avoid overdue charges (${(librarySettings?.fine_per_day ?? 5).toFixed(2)}/day).</p>
                 </div>
                 <button
                   onClick={() => setActiveTab('loans')}
@@ -422,6 +443,7 @@ const StudentDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {activeLoans.map((loan) => {
                     const dueInfo = getDueStatus(loan.due_date);
+                    const loanFine = fines.find(f => f.transaction_id === loan.id && f.status === 'unpaid');
                     return (
                       <div key={loan.id} className="p-5 rounded-2xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors flex flex-col justify-between space-y-4">
                         <div className="flex items-start gap-4">
@@ -448,9 +470,16 @@ const StudentDashboard: React.FC = () => {
                             <p>Issued: <span className="font-medium text-slate-700">{loan.issue_date}</span></p>
                             <p>Due Date: <span className="font-bold text-slate-900">{loan.due_date}</span></p>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-full text-xs border ${dueInfo.color}`}>
-                            {dueInfo.label}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`px-2.5 py-1 rounded-full text-xs border ${dueInfo.color}`}>
+                              {dueInfo.label}
+                            </span>
+                            {loanFine && (
+                              <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                Overdue Fine: ${loanFine.amount.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -483,6 +512,7 @@ const StudentDashboard: React.FC = () => {
                   <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
                     {activeLoans.map((loan) => {
                       const dueInfo = getDueStatus(loan.due_date);
+                      const loanFine = fines.find(f => f.transaction_id === loan.id && f.status === 'unpaid');
                       return (
                         <div key={loan.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50">
                           <div className="flex items-center gap-4">
@@ -500,9 +530,16 @@ const StudentDashboard: React.FC = () => {
                               <p className="text-slate-400">Due Date</p>
                               <p className="font-bold text-slate-800">{loan.due_date}</p>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-full text-xs border ${dueInfo.color}`}>
-                              {dueInfo.label}
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`px-2.5 py-1 rounded-full text-xs border ${dueInfo.color}`}>
+                                {dueInfo.label}
+                              </span>
+                              {loanFine && (
+                                <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                  Fine: ${loanFine.amount.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -666,7 +703,7 @@ const StudentDashboard: React.FC = () => {
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-xs space-y-6">
               <div className="border-b border-slate-100 pb-4">
                 <h2 className="text-xl font-bold text-slate-900">Overdue Fines & Penalty Ledger</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Detailed records of overdue library fines incurred on book returns.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Detailed records of overdue library fines incurred on active loans and returns.</p>
               </div>
 
               {/* Fines summary card */}
@@ -674,7 +711,7 @@ const StudentDashboard: React.FC = () => {
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Total Outstanding Balance</p>
                   <p className="text-3xl font-extrabold tracking-tight">${totalUnpaidFines.toFixed(2)}</p>
-                  <p className="text-xs text-slate-400">Calculated dynamically at standard $5.00/day policy</p>
+                  <p className="text-xs text-slate-400">Calculated dynamically at standard ${(librarySettings?.fine_per_day ?? 5).toFixed(2)}/day policy</p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 max-w-sm text-xs space-y-1">
@@ -690,32 +727,38 @@ const StudentDashboard: React.FC = () => {
 
               {/* Fines Table */}
               <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
-                {fines.map((fine) => (
-                  <div key={fine.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                          Ref #{fine.transaction_id}
-                        </span>
-                        <span className="text-sm font-bold text-slate-900">Overdue Penalty</span>
+                {fines.map((fine) => {
+                  const matchedTx = transactions.find(t => t.id === fine.transaction_id);
+                  const ratePerDay = (fine.amount / Math.max(1, fine.overdue_days)).toFixed(2);
+                  return (
+                    <div key={fine.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                            Ref #{fine.transaction_id}
+                          </span>
+                          <span className="text-sm font-bold text-slate-900">
+                            {matchedTx?.book?.title ? `Overdue Fine: "${matchedTx.book.title}"` : 'Overdue Penalty'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {fine.overdue_days} overdue days @ ${ratePerDay}/day
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-500">
-                        {fine.overdue_days} overdue days @ standard rate
-                      </p>
-                    </div>
 
-                    <div className="flex items-center gap-4 self-end sm:self-center">
-                      <p className="text-lg font-extrabold text-slate-900">${fine.amount.toFixed(2)}</p>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                        fine.status === 'paid'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                      }`}>
-                        {fine.status.toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-4 self-end sm:self-center">
+                        <p className="text-lg font-extrabold text-slate-900">${fine.amount.toFixed(2)}</p>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                          fine.status === 'paid'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}>
+                          {fine.status.toUpperCase()}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {fines.length === 0 && (
                   <div className="p-12 text-center text-slate-400">

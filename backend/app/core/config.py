@@ -7,7 +7,7 @@ DEFAULT_DB_FILE = BACKEND_DIR / "library.db"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Library Management System API"
-    VERSION: str = "1.0.0"
+    VERSION: str = "1.1.0"
     API_V1_STR: str = "/api"
     
     SECRET_KEY: str = os.getenv("JWT_SECRET", "super-secret-development-key-please-change-in-production")

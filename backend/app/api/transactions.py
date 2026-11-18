@@ -12,6 +12,59 @@ from app.core.config import settings
 
 router = APIRouter()
 
+def get_setting_int(db: Session, key: str, default: int) -> int:
+    s = db.query(models.SystemSetting).filter(models.SystemSetting.key == key).first()
+    if s and s.value:
+        try:
+            return int(s.value)
+        except ValueError:
+            pass
+    return default
+
+def get_setting_float(db: Session, key: str, default: float) -> float:
+    s = db.query(models.SystemSetting).filter(models.SystemSetting.key == key).first()
+    if s and s.value:
+        try:
+            return float(s.value)
+        except ValueError:
+            pass
+    return default
+
+def sync_overdue_fines(db: Session):
+    today = date.today()
+    fine_rate = get_setting_float(db, "fine_per_day", settings.FINE_PER_DAY)
+    
+    overdue_txs = db.query(models.BorrowTransaction).filter(
+        models.BorrowTransaction.status == "issued",
+        models.BorrowTransaction.due_date < today
+    ).all()
+    
+    updated = False
+    for tx in overdue_txs:
+        due = tx.due_date
+        if isinstance(due, str):
+            due = date.fromisoformat(due)
+        overdue_days = (today - due).days
+        if overdue_days > 0:
+            fine_amount = round(overdue_days * fine_rate, 2)
+            fine = db.query(models.Fine).filter(models.Fine.transaction_id == tx.id).first()
+            if not fine:
+                fine = models.Fine(
+                    transaction_id=tx.id,
+                    amount=fine_amount,
+                    overdue_days=overdue_days,
+                    status="unpaid"
+                )
+                db.add(fine)
+                updated = True
+            elif fine.status == "unpaid":
+                if fine.overdue_days != overdue_days or fine.amount != fine_amount:
+                    fine.overdue_days = overdue_days
+                    fine.amount = fine_amount
+                    updated = True
+    if updated:
+        db.commit()
+
 @router.get("", response_model=List[schemas.BorrowResponse])
 def get_transactions(
     skip: int = 0,
@@ -21,6 +74,7 @@ def get_transactions(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
+    sync_overdue_fines(db)
     query = db.query(models.BorrowTransaction)
     
     if current_user.role == "student":
@@ -50,6 +104,7 @@ def get_fines(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
+    sync_overdue_fines(db)
     query = db.query(models.Fine)
     
     if current_user.role == "student":
@@ -71,26 +126,6 @@ def get_fines(
         query = query.filter(models.Fine.status == status)
     
     return query.all()
-
-
-
-def get_setting_int(db: Session, key: str, default: int) -> int:
-    s = db.query(models.SystemSetting).filter(models.SystemSetting.key == key).first()
-    if s and s.value:
-        try:
-            return int(s.value)
-        except ValueError:
-            pass
-    return default
-
-def get_setting_float(db: Session, key: str, default: float) -> float:
-    s = db.query(models.SystemSetting).filter(models.SystemSetting.key == key).first()
-    if s and s.value:
-        try:
-            return float(s.value)
-        except ValueError:
-            pass
-    return default
 
 @router.post("/issue", response_model=schemas.BorrowResponse, status_code=status.HTTP_201_CREATED)
 def issue_book(
@@ -169,21 +204,37 @@ def return_book(
     db.commit()
     db.refresh(transaction)
     
-    fine_obj = None
-    # Calculate fine if overdue
-    overdue_days = (transaction.return_date - transaction.due_date).days
+    fine_obj = db.query(models.Fine).filter(models.Fine.transaction_id == transaction.id).first()
+    
+    ret_date = transaction.return_date
+    if isinstance(ret_date, str):
+        ret_date = date.fromisoformat(ret_date)
+    due_date = transaction.due_date
+    if isinstance(due_date, str):
+        due_date = date.fromisoformat(due_date)
+        
+    overdue_days = (ret_date - due_date).days
     if overdue_days > 0:
         fine_rate = get_setting_float(db, "fine_per_day", settings.FINE_PER_DAY)
-        fine_amount = overdue_days * fine_rate
-        fine_obj = models.Fine(
-            transaction_id=transaction.id,
-            amount=fine_amount,
-            overdue_days=overdue_days,
-            status="unpaid"
-        )
-        db.add(fine_obj)
+        fine_amount = round(overdue_days * fine_rate, 2)
+        if not fine_obj:
+            fine_obj = models.Fine(
+                transaction_id=transaction.id,
+                amount=fine_amount,
+                overdue_days=overdue_days,
+                status="unpaid"
+            )
+            db.add(fine_obj)
+        elif fine_obj.status == "unpaid":
+            fine_obj.amount = fine_amount
+            fine_obj.overdue_days = overdue_days
         db.commit()
         db.refresh(fine_obj)
+    else:
+        if fine_obj and fine_obj.status == "unpaid":
+            db.delete(fine_obj)
+            db.commit()
+            fine_obj = None
         
     return {"transaction": transaction, "fine": fine_obj}
 

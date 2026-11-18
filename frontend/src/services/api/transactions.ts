@@ -32,7 +32,7 @@ export interface Fine {
 
 export const transactionService = {
   getTransactions: async (params?: { status?: string; member_id?: number; skip?: number; limit?: number }) => {
-    const response = await api.get<BorrowTransaction[]>('/transactions/', { params });
+    const response = await api.get<BorrowTransaction[]>('/transactions', { params });
     return response.data;
   },
 
@@ -47,7 +47,7 @@ export const transactionService = {
   },
 
   getFines: async (params?: { status?: string }) => {
-    const response = await api.get<Fine[]>('/transactions/fines/', { params });
+    const response = await api.get<Fine[]>('/transactions/fines', { params });
     return response.data;
   },
 
